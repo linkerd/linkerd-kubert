@@ -1,12 +1,13 @@
+# Dependabot are scheduled to avoid contention with normal workday CI usage. We
+# start running updates at 10AM UTC (2AM PST).
 version: 2
 updates:
   - package-ecosystem: cargo
     directory: "/"
     schedule:
-      interval: weekly
-      day: friday
-      time: "03:30"
-      timezone: Etc/UTC
+      interval: daily
+      time: "10:00"
+      timezone: "UTC"
     allow:
       - dependency-type: all
     groups:

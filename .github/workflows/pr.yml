@@ -46,6 +46,7 @@ jobs:
         with:
           files: |
             Cargo.toml
+            Cargo.lock
             kubert/**
             kubert-examples/**
 
@@ -54,6 +55,7 @@ jobs:
         with:
           files: |
             Cargo.toml
+            Cargo.lock
             kubert-prometheus-process/**
 
       - id: kubert-prometheus-tokio
@@ -61,6 +63,7 @@ jobs:
         with:
           files: |
             Cargo.toml
+            Cargo.lock
             kubert-prometheus-tokio/**
 
       - id: cargo
@@ -80,6 +83,7 @@ jobs:
         with:
           files: |
             **/*.rs
+            Cargo.lock
 
     outputs:
       by-dependabot: ${{ github.actor == 'dependabot[bot]' }}

@@ -216,8 +216,8 @@ jobs:
     strategy:
       matrix:
         k8s:
-          - v1.21
-          - v1.33
+          - v1.35
+          - v1.31
     timeout-minutes: 30 # building with OpenSSL can be quite slow...
     runs-on: ubuntu-24.04
     env:
@@ -248,7 +248,7 @@ jobs:
     strategy:
       matrix:
         k8s:
-          - v1.21
+          - v1.35
           - v1.31
     timeout-minutes: 15
     runs-on: ubuntu-24.04

@@ -71,17 +71,17 @@ jobs:
           generate_release_notes: false
           make_latest: false
 
-  crate:
-    # Only publish the crate after the rest of the release succeeds.
-    needs: [meta, release]
-    timeout-minutes: 10
-    runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v46-rust
-    env:
-      RUSTFLAGS: '--cfg tokio_unstable'
-      RUSTDOCFLAGS: '--cfg tokio_unstable'
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-      - run: cargo publish --package=kubert-prometheus-tokio --dry-run
-      - if: needs.meta.outputs.mode == 'release'
-        run: cargo publish --package=kubert-prometheus-tokio --token=${{ secrets.CRATESIO_TOKEN }}
+  # crate:
+  #   # Only publish the crate after the rest of the release succeeds.
+  #   needs: [meta, release]
+  #   timeout-minutes: 10
+  #   runs-on: ubuntu-24.04
+  #   container: ghcr.io/linkerd/dev:v46-rust
+  #   env:
+  #     RUSTFLAGS: '--cfg tokio_unstable'
+  #     RUSTDOCFLAGS: '--cfg tokio_unstable'
+  #   steps:
+  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+  #     - run: cargo publish --package=kubert-prometheus-tokio --dry-run
+  #     - if: needs.meta.outputs.mode == 'release'
+  #       run: cargo publish --package=kubert-prometheus-tokio --token=${{ secrets.CRATESIO_TOKEN }}

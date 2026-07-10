@@ -46,12 +46,13 @@ async fn exclusive() {
         "alice"
     );
     assert_eq!(
-        *rsrc
-            .renew_time
+        rsrc.renew_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
-            .expect("renewTime"),
-        claim0.expiry - params.lease_duration
+            .expect("renewTime")
+            .round(jiff::TimestampRound::new().smallest(jiff::Unit::Microsecond))
+            .unwrap(),
+        (claim0.expiry - params.lease_duration)
     );
     // Since we just acquired this, the acquire time and renew time are the
     // same.

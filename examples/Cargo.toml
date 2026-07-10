@@ -24,8 +24,8 @@ features = [
 
 [dev-dependencies]
 anyhow = "1"
-chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
+jiff = "0.2"
 maplit = "1"
 prometheus-client = "0.24"
 rand = "0.10"

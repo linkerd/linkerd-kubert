@@ -7,6 +7,7 @@
 //! [`LeaseManager`] interacts with a [`coordv1::Lease`] resource to ensure that
 //! only a single claimant owns the lease at a time.
 
+use jiff::Timestamp;
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
 use std::{borrow::Cow, sync::Arc};
 use tokio::time::{self, Duration};
@@ -70,7 +71,7 @@ pub struct Claim {
     pub holder: String,
 
     /// The time that the lease expires.
-    pub expiry: chrono::DateTime<chrono::Utc>,
+    pub expiry: Timestamp,
 }
 
 /// Indicates an error interacting with the Lease API
@@ -130,7 +131,7 @@ impl Claim {
     /// Returns true iff the claim is still valid according to the system clock
     #[inline]
     pub fn is_current(&self) -> bool {
-        chrono::Utc::now() < self.expiry
+        Timestamp::now() < self.expiry
     }
 
     /// Returns true iff the claim is still valid for the provided claimant
@@ -146,8 +147,12 @@ impl Claim {
 
     /// Waits until there is a grace period remaining before the claim expires
     pub async fn expire_with_grace(&self, grace: Duration) {
-        if let Ok(remaining) = (self.expiry - chrono::Utc::now()).to_std() {
-            let sleep = remaining.saturating_sub(grace);
+        let now = Timestamp::now();
+        let remaining = self.expiry - now;
+
+        if remaining.is_positive() {
+            let sleep = remaining.checked_sub(grace).unwrap_or_default();
+            let sleep = Duration::try_from(sleep).expect("can convert a Span to a Duration");
             if !sleep.is_zero() {
                 tokio::time::sleep(sleep).await;
             }
@@ -227,10 +232,8 @@ impl LeaseManager {
                 // If the claim is held by the provided claimant, then consider
                 // renewing the claim.
                 if claim.holder == claimant {
-                    let renew_at = claim.expiry
-                        - chrono::Duration::from_std(params.renew_grace_period)
-                            .unwrap_or_else(|_| chrono::Duration::zero());
-                    if chrono::Utc::now() < renew_at {
+                    let renew_at = claim.expiry - params.renew_grace_period;
+                    if Timestamp::now() < renew_at {
                         return Ok(claim.clone());
                     }
 
@@ -435,11 +438,9 @@ impl LeaseManager {
         &self,
         meta: &Meta,
         claimant: &str,
-        params: &ClaimParams,
+        ClaimParams { lease_duration, .. }: &ClaimParams,
     ) -> Result<(Arc<Claim>, Meta), Error> {
-        let lease_duration =
-            chrono::Duration::from_std(params.lease_duration).unwrap_or(chrono::Duration::MAX);
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let lease = self
             .patch(&kube_client::api::Patch::Apply(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
@@ -451,7 +452,7 @@ impl LeaseManager {
                     "acquireTime": metav1::MicroTime(now),
                     "renewTime": metav1::MicroTime(now),
                     "holderIdentity": claimant,
-                    "leaseDurationSeconds": lease_duration.num_seconds(),
+                    "leaseDurationSeconds": lease_duration.as_secs(),
                     "leaseTransitions": meta.transitions + 1,
                 },
             })))
@@ -459,7 +460,7 @@ impl LeaseManager {
 
         let claim = Claim {
             holder: claimant.to_string(),
-            expiry: now + lease_duration,
+            expiry: now + *lease_duration,
         };
         let meta = Meta {
             version: lease
@@ -481,11 +482,9 @@ impl LeaseManager {
         &self,
         meta: &Meta,
         claimant: &str,
-        params: &ClaimParams,
+        ClaimParams { lease_duration, .. }: &ClaimParams,
     ) -> Result<(Arc<Claim>, Meta), Error> {
-        let lease_duration =
-            chrono::Duration::from_std(params.lease_duration).unwrap_or(chrono::Duration::MAX);
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let lease = self
             .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
@@ -495,14 +494,14 @@ impl LeaseManager {
                 },
                 "spec": {
                     "renewTime": metav1::MicroTime(now),
-                    "leaseDurationSeconds": lease_duration.num_seconds(),
+                    "leaseDurationSeconds": lease_duration.as_secs(),
                 },
             })))
             .await?;
 
         let claim = Claim {
             holder: claimant.to_string(),
-            expiry: now + lease_duration,
+            expiry: now + *lease_duration,
         };
         let meta = Meta {
             version: lease
@@ -564,12 +563,14 @@ impl LeaseManager {
         }
 
         let holder = or_unclaimed!(spec.holder_identity);
-
         let metav1::MicroTime(renew_time) = or_unclaimed!(spec.renew_time);
-        let lease_duration =
-            chrono::Duration::seconds(or_unclaimed!(spec.lease_duration_seconds).into());
+        let lease_duration_seconds = or_unclaimed!(spec.lease_duration_seconds);
+
+        let lease_duration = u64::try_from(lease_duration_seconds)
+            .map(Duration::from_secs)
+            .expect("lease durations should not be negative");
         let expiry = renew_time + lease_duration;
-        if expiry <= chrono::Utc::now() {
+        if expiry <= Timestamp::now() {
             return Ok(State { meta, claim: None });
         }
 
@@ -581,9 +582,9 @@ impl LeaseManager {
 
     fn is_conflict(err: &Error) -> bool {
         matches!(
-            err,
-            Error::Api(kube_client::Error::Api(kube_core::ErrorResponse { code, .. }))
-                if hyper::StatusCode::from_u16(*code).ok() == Some(hyper::StatusCode::CONFLICT)
+            &err,
+            Error::Api(kube_client::Error::Api(status))
+                if status.is_conflict()
         )
     }
 }

@@ -147,15 +147,17 @@ impl Claim {
 
     /// Waits until there is a grace period remaining before the claim expires
     pub async fn expire_with_grace(&self, grace: Duration) {
-        let now = Timestamp::now();
-        let remaining = self.expiry - now;
+        // The conversion fails when the span is negative, i.e. when the claim
+        // has already expired, in which case there's nothing to wait for.
+        let Ok(remaining) = Duration::try_from(self.expiry - Timestamp::now()) else {
+            return;
+        };
 
-        if remaining.is_positive() {
-            let sleep = remaining.checked_sub(grace).unwrap_or_default();
-            let sleep = Duration::try_from(sleep).expect("can convert a Span to a Duration");
-            if !sleep.is_zero() {
-                tokio::time::sleep(sleep).await;
-            }
+        // The grace period may exceed the remaining time, in which case the
+        // claim is already renewable.
+        let sleep = remaining.saturating_sub(grace);
+        if !sleep.is_zero() {
+            tokio::time::sleep(sleep).await;
         }
     }
 }
@@ -566,9 +568,12 @@ impl LeaseManager {
         let metav1::MicroTime(renew_time) = or_unclaimed!(spec.renew_time);
         let lease_duration_seconds = or_unclaimed!(spec.lease_duration_seconds);
 
-        let lease_duration = u64::try_from(lease_duration_seconds)
-            .map(Duration::from_secs)
-            .expect("lease durations should not be negative");
+        // The API server should never report a negative duration, but it's not
+        // worth crashing over: such a lease can't be held by anyone.
+        let lease_duration = match u64::try_from(lease_duration_seconds) {
+            Ok(secs) => Duration::from_secs(secs),
+            Err(_) => return Ok(State { meta, claim: None }),
+        };
         let expiry = renew_time + lease_duration;
         if expiry <= Timestamp::now() {
             return Ok(State { meta, claim: None });
@@ -586,5 +591,42 @@ impl LeaseManager {
             Error::Api(kube_client::Error::Api(status))
                 if status.is_conflict()
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use tokio_test::task;
+
+    fn claim_in(remaining: Duration) -> Claim {
+        Claim {
+            holder: "alice".to_string(),
+            expiry: Timestamp::now() + remaining,
+        }
+    }
+
+    #[tokio::test]
+    async fn expire_with_grace_exceeding_remaining() {
+        let claim = claim_in(Duration::from_secs(1));
+        let mut fut = task::spawn(claim.expire_with_grace(Duration::from_secs(5)));
+        assert!(fut.poll().is_ready(), "already within the grace period");
+    }
+
+    #[tokio::test]
+    async fn expire_with_grace_when_expired() {
+        let claim = Claim {
+            holder: "alice".to_string(),
+            expiry: Timestamp::now() - Duration::from_secs(1),
+        };
+        let mut fut = task::spawn(claim.expire_with_grace(Duration::from_secs(5)));
+        assert!(fut.poll().is_ready(), "already expired");
+    }
+
+    #[tokio::test]
+    async fn expire_with_grace_waits() {
+        let claim = claim_in(Duration::from_secs(10));
+        let mut fut = task::spawn(claim.expire_with_grace(Duration::from_secs(5)));
+        assert!(fut.poll().is_pending(), "grace period has not been reached");
     }
 }

@@ -1,5 +1,6 @@
 #![deny(warnings, rust_2018_idioms)]
 
+use jiff::Unit;
 use k8s_openapi::{
     api::coordination::v1 as coordv1,
     apimachinery::pkg::apis::meta::v1::{self as metav1},
@@ -9,6 +10,15 @@ use maplit::{btreemap, convert_args};
 use tokio::time;
 
 type Api = kube::Api<coordv1::Lease>;
+
+macro_rules! assert_time_eq {
+    ($a:expr, $b:expr $(,)?) => {
+        assert_eq!(
+            $a.round(Unit::Millisecond).unwrap().to_string(),
+            $b.round(Unit::Millisecond).unwrap().to_string(),
+        );
+    };
+}
 
 #[tokio::test(flavor = "current_thread")]
 async fn exclusive() {
@@ -33,7 +43,7 @@ async fn exclusive() {
     let lease1 = handle.init_new().await;
     let claim1 = lease1.ensure_claimed("bob", &params).await.expect("claim");
     assert_eq!(claim0.holder, claim1.holder);
-    assert_eq!(claim0.expiry, claim1.expiry);
+    assert_time_eq!(claim0.expiry, claim1.expiry);
     assert!(claim0.is_current_for("alice"));
     assert!(claim1.is_current_for("alice"));
     assert!(!claim0.is_current_for("bob"));
@@ -45,14 +55,12 @@ async fn exclusive() {
         rsrc.holder_identity.as_deref().expect("holderIdentity"),
         "alice"
     );
-    assert_eq!(
+    assert_time_eq!(
         rsrc.renew_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
-            .expect("renewTime")
-            .round(jiff::TimestampRound::new().smallest(jiff::Unit::Microsecond))
-            .unwrap(),
-        (claim0.expiry - params.lease_duration)
+            .expect("renewTime"),
+        claim0.expiry - params.lease_duration,
     );
     // Since we just acquired this, the acquire time and renew time are the
     // same.
@@ -99,9 +107,8 @@ async fn expires() {
         rsrc.holder_identity.as_deref().expect("holderIdentity"),
         "bob"
     );
-    assert_eq!(
-        *rsrc
-            .renew_time
+    assert_time_eq!(
+        rsrc.renew_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
@@ -156,17 +163,15 @@ async fn renews() {
         rsrc.holder_identity.as_deref().expect("holderIdentity"),
         "alice"
     );
-    assert_eq!(
-        *rsrc
-            .renew_time
+    assert_time_eq!(
+        rsrc.renew_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
         claim2.expiry - params.lease_duration,
     );
-    assert_eq!(
-        *rsrc
-            .acquire_time
+    assert_time_eq!(
+        rsrc.acquire_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
@@ -201,17 +206,15 @@ async fn renews() {
         rsrc.holder_identity.as_deref().expect("holderIdentity"),
         "bob"
     );
-    assert_eq!(
-        *rsrc
-            .renew_time
+    assert_time_eq!(
+        rsrc.renew_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
         claim3.expiry - params.lease_duration,
     );
-    assert_eq!(
-        *rsrc
-            .acquire_time
+    assert_time_eq!(
+        rsrc.acquire_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
@@ -274,17 +277,15 @@ async fn vacate_expired_noop() {
     // Inspect the lease resource to verify that it has all expected fields.
     let rsrc = handle.get().await;
     assert_eq!(rsrc.holder_identity.as_deref(), Some("id"));
-    assert_eq!(
-        *rsrc
-            .renew_time
+    assert_time_eq!(
+        rsrc.renew_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
         claim.expiry - params.lease_duration,
     );
-    assert_eq!(
-        *rsrc
-            .acquire_time
+    assert_time_eq!(
+        rsrc.acquire_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),

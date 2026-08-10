@@ -4,7 +4,7 @@ version = "0.1.0"
 publish = false
 edition = "2021"
 license = "Apache-2.0"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [package.metadata.release]
 release = false
@@ -24,8 +24,8 @@ features = [
 
 [dev-dependencies]
 anyhow = "1"
-chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
+jiff = { version = "0.2", default-features = false, features = ["std"] }
 maplit = "1"
 prometheus-client = "0.24"
 rand = "0.10"

@@ -275,9 +275,7 @@ where
 
 fn print_claim(claim: &kubert::lease::Claim, identity: &str) {
     let holder = &claim.holder;
-    let expiry = claim
-        .expiry
-        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let expiry = claim.expiry.strftime("%Y-%m-%dT%H:%M:%SZ");
 
     if !claim.is_current() {
         println!("! Expired for {holder} at {expiry}");

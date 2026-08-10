@@ -13,8 +13,8 @@ type Api = kube::Api<coordv1::Lease>;
 macro_rules! assert_time_eq {
     ($a:expr, $b:expr $(,)?) => {
         assert_eq!(
-            $a.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-            $b.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            $a.strftime("%Y-%m-%dT%H:%M:%S.%3fZ").to_string(),
+            $b.strftime("%Y-%m-%dT%H:%M:%S.%3fZ").to_string(),
         );
     };
 }
@@ -42,7 +42,7 @@ async fn exclusive() {
     let lease1 = handle.init_new().await;
     let claim1 = lease1.ensure_claimed("bob", &params).await.expect("claim");
     assert_eq!(claim0.holder, claim1.holder);
-    assert_eq!(claim0.expiry.timestamp(), claim1.expiry.timestamp());
+    assert_eq!(claim0.expiry.as_second(), claim1.expiry.as_second());
     assert!(claim0.is_current_for("alice"));
     assert!(claim1.is_current_for("alice"));
     assert!(!claim0.is_current_for("bob"));
@@ -59,7 +59,7 @@ async fn exclusive() {
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim0.expiry - chrono::Duration::from_std(params.lease_duration).unwrap()
+        claim0.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap()
     );
     // Since we just acquired this, the acquire time and renew time are the
     // same.
@@ -111,7 +111,7 @@ async fn expires() {
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim1.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim1.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     // Since we just acquired this, the acquire time and renew time are the
     // same.
@@ -167,14 +167,14 @@ async fn renews() {
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim2.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim2.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     assert_time_eq!(
         rsrc.acquire_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim0.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim0.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     assert_eq!(
         time::Duration::from_secs(
@@ -210,14 +210,14 @@ async fn renews() {
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim3.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim3.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     assert_time_eq!(
         rsrc.acquire_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim3.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim3.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     assert_eq!(
         time::Duration::from_secs(
@@ -281,14 +281,14 @@ async fn vacate_expired_noop() {
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     assert_time_eq!(
         rsrc.acquire_time
             .as_ref()
             .map(|metav1::MicroTime(t)| t)
             .expect("renewTime"),
-        claim.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+        claim.expiry - jiff::SignedDuration::try_from(params.lease_duration).unwrap(),
     );
     assert_eq!(rsrc.lease_duration_seconds, Some(3));
     assert_eq!(rsrc.lease_transitions, Some(1));

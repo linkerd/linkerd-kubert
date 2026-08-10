@@ -70,7 +70,7 @@ pub struct Claim {
     pub holder: String,
 
     /// The time that the lease expires.
-    pub expiry: chrono::DateTime<chrono::Utc>,
+    pub expiry: jiff::Timestamp,
 }
 
 /// Indicates an error interacting with the Lease API
@@ -130,7 +130,7 @@ impl Claim {
     /// Returns true iff the claim is still valid according to the system clock
     #[inline]
     pub fn is_current(&self) -> bool {
-        chrono::Utc::now() < self.expiry
+        jiff::Timestamp::now() < self.expiry
     }
 
     /// Returns true iff the claim is still valid for the provided claimant
@@ -146,7 +146,7 @@ impl Claim {
 
     /// Waits until there is a grace period remaining before the claim expires
     pub async fn expire_with_grace(&self, grace: Duration) {
-        if let Ok(remaining) = (self.expiry - chrono::Utc::now()).to_std() {
+        if let Ok(remaining) = Duration::try_from(self.expiry - jiff::Timestamp::now()) {
             let sleep = remaining.saturating_sub(grace);
             if !sleep.is_zero() {
                 tokio::time::sleep(sleep).await;
@@ -227,10 +227,14 @@ impl LeaseManager {
                 // If the claim is held by the provided claimant, then consider
                 // renewing the claim.
                 if claim.holder == claimant {
-                    let renew_at = claim.expiry
-                        - chrono::Duration::from_std(params.renew_grace_period)
-                            .unwrap_or_else(|_| chrono::Duration::zero());
-                    if chrono::Utc::now() < renew_at {
+                    let renew_at = claim
+                        .expiry
+                        .saturating_sub(
+                            jiff::SignedDuration::try_from(params.renew_grace_period)
+                                .unwrap_or(jiff::SignedDuration::ZERO),
+                        )
+                        .unwrap_or(jiff::Timestamp::MIN);
+                    if jiff::Timestamp::now() < renew_at {
                         return Ok(claim.clone());
                     }
 
@@ -437,9 +441,9 @@ impl LeaseManager {
         claimant: &str,
         params: &ClaimParams,
     ) -> Result<(Arc<Claim>, Meta), Error> {
-        let lease_duration =
-            chrono::Duration::from_std(params.lease_duration).unwrap_or(chrono::Duration::MAX);
-        let now = chrono::Utc::now();
+        let lease_duration = jiff::SignedDuration::try_from(params.lease_duration)
+            .unwrap_or(jiff::SignedDuration::MAX);
+        let now = jiff::Timestamp::now();
         let lease = self
             .patch(&kube_client::api::Patch::Apply(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
@@ -451,7 +455,7 @@ impl LeaseManager {
                     "acquireTime": metav1::MicroTime(now),
                     "renewTime": metav1::MicroTime(now),
                     "holderIdentity": claimant,
-                    "leaseDurationSeconds": lease_duration.num_seconds(),
+                    "leaseDurationSeconds": lease_duration.as_secs(),
                     "leaseTransitions": meta.transitions + 1,
                 },
             })))
@@ -459,7 +463,9 @@ impl LeaseManager {
 
         let claim = Claim {
             holder: claimant.to_string(),
-            expiry: now + lease_duration,
+            expiry: now
+                .saturating_add(lease_duration)
+                .unwrap_or(jiff::Timestamp::MAX),
         };
         let meta = Meta {
             version: lease
@@ -483,9 +489,9 @@ impl LeaseManager {
         claimant: &str,
         params: &ClaimParams,
     ) -> Result<(Arc<Claim>, Meta), Error> {
-        let lease_duration =
-            chrono::Duration::from_std(params.lease_duration).unwrap_or(chrono::Duration::MAX);
-        let now = chrono::Utc::now();
+        let lease_duration = jiff::SignedDuration::try_from(params.lease_duration)
+            .unwrap_or(jiff::SignedDuration::MAX);
+        let now = jiff::Timestamp::now();
         let lease = self
             .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
@@ -495,14 +501,16 @@ impl LeaseManager {
                 },
                 "spec": {
                     "renewTime": metav1::MicroTime(now),
-                    "leaseDurationSeconds": lease_duration.num_seconds(),
+                    "leaseDurationSeconds": lease_duration.as_secs(),
                 },
             })))
             .await?;
 
         let claim = Claim {
             holder: claimant.to_string(),
-            expiry: now + lease_duration,
+            expiry: now
+                .saturating_add(lease_duration)
+                .unwrap_or(jiff::Timestamp::MAX),
         };
         let meta = Meta {
             version: lease
@@ -567,9 +575,11 @@ impl LeaseManager {
 
         let metav1::MicroTime(renew_time) = or_unclaimed!(spec.renew_time);
         let lease_duration =
-            chrono::Duration::seconds(or_unclaimed!(spec.lease_duration_seconds).into());
-        let expiry = renew_time + lease_duration;
-        if expiry <= chrono::Utc::now() {
+            jiff::SignedDuration::from_secs(or_unclaimed!(spec.lease_duration_seconds).into());
+        let expiry = renew_time
+            .saturating_add(lease_duration)
+            .unwrap_or(jiff::Timestamp::MAX);
+        if expiry <= jiff::Timestamp::now() {
             return Ok(State { meta, claim: None });
         }
 
@@ -582,8 +592,7 @@ impl LeaseManager {
     fn is_conflict(err: &Error) -> bool {
         matches!(
             err,
-            Error::Api(kube_client::Error::Api(kube_core::ErrorResponse { code, .. }))
-                if hyper::StatusCode::from_u16(*code).ok() == Some(hyper::StatusCode::CONFLICT)
+            Error::Api(kube_client::Error::Api(status)) if status.is_conflict()
         )
     }
 }

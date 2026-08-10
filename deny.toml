@@ -22,6 +22,11 @@ exceptions = [
         "MIT",
         "OpenSSL",
     ], name = "ring", version = "*" },
+    # Mozilla's root certificate data, pulled in transitively by `kube-client`
+    # via `rustls-platform-verifier`.
+    { allow = [
+        "CDLA-Permissive-2.0",
+    ], name = "webpki-root-certs", version = "*" },
 ]
 
 [[licenses.clarify]]

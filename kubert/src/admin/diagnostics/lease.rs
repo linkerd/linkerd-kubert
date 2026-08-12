@@ -1,3 +1,4 @@
+use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use parking_lot::RwLock;
 use std::{
@@ -54,7 +55,7 @@ impl LeaseDiagnostics {
             field_manager,
         }: &crate::LeaseParams,
     ) -> Self {
-        let now = Time(chrono::Utc::now());
+        let now = Time(Timestamp::now());
         Self(Arc::new(RwLock::new(LeaseState {
             name: name.clone(),
             namespace: namespace.clone(),
@@ -90,7 +91,7 @@ impl LeaseDiagnostics {
         {
             return;
         }
-        let now = Time(chrono::Utc::now());
+        let now = Time(Timestamp::now());
         state.current = claim
             .as_deref()
             .cloned()

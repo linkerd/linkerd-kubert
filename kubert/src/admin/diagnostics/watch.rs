@@ -1,4 +1,5 @@
 use ahash::AHashMap;
+use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, Time};
 use kube_runtime::watcher;
 use parking_lot::RwLock;
@@ -88,7 +89,7 @@ impl WatchDiagnostics {
             api_url: api_url.to_string(),
             label_selector: label_selector.unwrap_or_default().to_string(),
             stats: WatchStats {
-                creation_timestamp: Time(chrono::Utc::now()),
+                creation_timestamp: Time(Timestamp::now()),
                 errors: 0,
                 last_error: None,
                 resets: 0,
@@ -137,7 +138,7 @@ impl WatchDiagnostics {
             uid: meta.uid.clone().unwrap_or_default(),
         };
 
-        let now = Time(chrono::Utc::now());
+        let now = Time(Timestamp::now());
         let WatchState {
             ref mut known,
             ref mut resetting,

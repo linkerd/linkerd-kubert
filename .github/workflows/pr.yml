@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - id: build
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             .github/workflows/pr.yml
@@ -29,20 +29,20 @@ jobs:
             examples/Dockerfile
 
       - id: markdown
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             **/*.md
 
       - id: actions
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             .github/workflows/**
             .devcontainer/*
 
       - id: kubert
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             Cargo.toml
@@ -51,7 +51,7 @@ jobs:
             kubert-examples/**
 
       - id: kubert-prometheus-process
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             Cargo.toml
@@ -59,7 +59,7 @@ jobs:
             kubert-prometheus-process/**
 
       - id: kubert-prometheus-tokio
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             Cargo.toml
@@ -67,19 +67,19 @@ jobs:
             kubert-prometheus-tokio/**
 
       - id: cargo
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             **/Cargo.toml
 
       - id: deny
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             deny.toml
 
       - id: rust
-        uses: tj-actions/changed-files@934b2d2c7e653bb8c968afed5a0428617f09aa24
+        uses: tj-actions/changed-files@9c9e94395b39f2628ceed2caba849f630866e9e0
         with:
           files: |
             **/*.rs

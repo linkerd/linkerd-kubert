@@ -9,20 +9,13 @@ allow = [
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
-    "OpenSSL",
     "Unicode-3.0",
     "Zlib",
 ]
 confidence-threshold = 0.8
-exceptions = [
-    { allow = [
-        "ISC",
-        "MIT",
-        "OpenSSL",
-    ], name = "ring", version = "*" },
-]
 
 [[licenses.clarify]]
 name = "ring"
@@ -48,8 +41,6 @@ skip-tree = [
     # `parking-lot-core` and `dirs-next` (transitive deps via `kube-client`)
     # depend on incompatible versions of `redox_syscall`.
     { name = "redox_syscall" },
-    # Until thiserror v2 is widely used.
-    { name = "thiserror", version = "1" },
 ]
 
 [sources]

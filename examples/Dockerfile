@@ -1,4 +1,4 @@
-FROM ghcr.io/linkerd/dev:v46-rust as build
+FROM ghcr.io/linkerd/dev:v51-rust as build
 WORKDIR /kubert
 COPY . .
 ENV CARGO_NET_RETRY=10 \
@@ -11,6 +11,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --package=kubert-examples --examples \
     --no-default-features --features=${FEATURES}
 
-FROM gcr.io/distroless/cc-debian12:debug
+FROM gcr.io/distroless/cc-debian13:debug
 COPY --from=build /kubert/target/debug/examples/watch-pods /watch-pods
 ENTRYPOINT ["/watch-pods"]

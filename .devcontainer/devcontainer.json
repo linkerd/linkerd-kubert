@@ -1,6 +1,6 @@
 {
 	"name": "kubert",
-	"image": "ghcr.io/linkerd/dev:v46",
+	"image": "ghcr.io/linkerd/dev:v51",
 	"runArgs": [
 		"--init",
 		// Use the host network so we can access k3d, etc.

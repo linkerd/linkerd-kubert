@@ -11,6 +11,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --package=kubert-examples --examples \
     --no-default-features --features=${FEATURES}
 
-FROM gcr.io/distroless/cc-debian12:debug
+FROM gcr.io/distroless/cc-debian13:debug
 COPY --from=build /kubert/target/debug/examples/watch-pods /watch-pods
 ENTRYPOINT ["/watch-pods"]

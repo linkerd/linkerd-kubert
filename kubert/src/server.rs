@@ -332,7 +332,8 @@ where
         .into_owned();
     tokio::pin!(conn);
     let res = tokio::select! {
-        biased; // Connections are far more likely to close rather than the entire service being drained.
+        biased; // Always check if the connection is closed first. No need for graceful shutdown in
+                // that case
         res = &mut conn => res,
         release = drain.signaled() => {
             conn.as_mut().graceful_shutdown();

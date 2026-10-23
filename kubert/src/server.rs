@@ -13,8 +13,19 @@
 //! selected. This is to allow the server module to be used in a library crate
 //! which does not require either particular TLS implementation, so that the
 //! top-level binary crate may choose which TLS implementation is used.
+//!
+//! # Timeouts
+//!
+//! The server limits how long clients may take to send HTTP/1 request headers
+//! (2s by default, see [`ServerArgs::server_http1_header_read_timeout_seconds`]).
+//! This limit also applies to idle keep-alive connections waiting for their
+//! next request. Admission controllers called by the Kubernetes API server
+//! should raise it above the API server's 90s idle connection timeout to avoid
+//! sporadic `EOF` errors.
 
-use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
+use std::{
+    convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc, time::Duration,
+};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
@@ -47,6 +58,19 @@ pub struct ServerArgs {
     /// certificate.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_certs: Option<TlsCertPath>,
+
+    /// The timeout, in seconds, for reading HTTP/1 request headers.
+    ///
+    /// This also limits how long idle keep-alive connections are kept open.
+    /// When serving the Kubernetes API server (e.g. as an admission
+    /// controller), set this above the API server's 90s idle connection
+    /// timeout to avoid sporadic `EOF` errors.
+    #[cfg_attr(feature = "clap", clap(
+        long,
+        default_value = "2",
+        value_parser = clap::value_parser!(u64).range(1..),
+    ))]
+    pub server_http1_header_read_timeout_seconds: u64,
 }
 
 /// A running server
@@ -56,6 +80,7 @@ pub struct Bound {
     local_addr: SocketAddr,
     tcp: tokio::net::TcpListener,
     tls: Arc<TlsPaths>,
+    opts: ServerOptions,
 }
 
 /// A running server
@@ -114,6 +139,12 @@ struct TlsPaths {
     certs: TlsCertPath,
 }
 
+/// Options derived from [`ServerArgs`]
+#[derive(Copy, Clone, Debug)]
+struct ServerOptions {
+    http1_header_read_timeout: Duration,
+}
+
 // === impl ServerArgs ===
 
 impl ServerArgs {
@@ -137,10 +168,18 @@ impl ServerArgs {
             .await
             .map_err(|e| Error::Bind(self.server_addr, e))?;
         let local_addr = tcp.local_addr().map_err(Error::LocalAddr)?;
+
+        let opts = ServerOptions {
+            http1_header_read_timeout: Duration::from_secs(
+                self.server_http1_header_read_timeout_seconds,
+            ),
+        };
+
         Ok(Bound {
             local_addr,
             tcp,
             tls,
+            opts,
         })
     }
 }
@@ -175,10 +214,11 @@ impl Bound {
             local_addr,
             tcp,
             tls,
+            opts,
         } = self;
 
         let task = tokio::spawn(
-            accept_loop(tcp, drain, service, tls)
+            accept_loop(tcp, drain, service, tls, opts)
                 .instrument(info_span!("server", port = %local_addr.port())),
         );
 
@@ -205,8 +245,13 @@ impl SpawnedServer {
     }
 }
 
-async fn accept_loop<S, B>(tcp: TcpListener, drain: drain::Watch, service: S, tls: Arc<TlsPaths>)
-where
+async fn accept_loop<S, B>(
+    tcp: TcpListener,
+    drain: drain::Watch,
+    service: S,
+    tls: Arc<TlsPaths>,
+    opts: ServerOptions,
+) where
     S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
         + Clone
         + Send
@@ -252,17 +297,24 @@ where
         };
 
         tokio::spawn(
-            serve_conn(socket, drain.clone(), service.clone(), tls.clone()).instrument(info_span!(
-                "conn",
-                client.ip = %client_addr.ip(),
-                client.port = %client_addr.port(),
-            )),
+            serve_conn(socket, drain.clone(), service.clone(), tls.clone(), opts).instrument(
+                info_span!(
+                    "conn",
+                    client.ip = %client_addr.ip(),
+                    client.port = %client_addr.port(),
+                ),
+            ),
         );
     }
 }
 
-async fn serve_conn<S, B>(socket: TcpStream, drain: drain::Watch, service: S, tls: Arc<TlsPaths>)
-where
+async fn serve_conn<S, B>(
+    socket: TcpStream,
+    drain: drain::Watch,
+    service: S,
+    tls: Arc<TlsPaths>,
+    opts: ServerOptions,
+) where
     S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
         + Clone
         + Send
@@ -319,10 +371,11 @@ where
     // signaled, tell the HTTP connection to terminate gracefully when in-flight
     // requests have completed.
     let mut builder = hyper_util::server::conn::auto::Builder::new(Executor);
-    // Prevent port scanners, etc, from holding connections open.
+    // Limit how long clients may take to send request headers. This also
+    // limits how long idle keep-alive connections are held open.
     builder
         .http1()
-        .header_read_timeout(std::time::Duration::from_secs(2))
+        .header_read_timeout(opts.http1_header_read_timeout)
         .timer(hyper_util::rt::TokioTimer::default());
     let graceful = hyper_util::server::graceful::GracefulShutdown::new();
     let conn = graceful.watch(

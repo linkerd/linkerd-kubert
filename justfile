@@ -78,6 +78,7 @@ test-cluster-create:
     set -euo pipefail
     export K3S_DISABLE='local-storage,traefik,servicelb,metrics-server@server:*'
     export K3D_CREATE_ARGS='--no-lb'
+    export K3S_CHANNEL="${KUBERT_TEST_CLUSTER_VERSION:-latest}"
     just-k3d create
 
 test-cluster-delete:
@@ -89,7 +90,7 @@ _test-cluster-exists:
 test-cluster-import-examples: build-examples-image _test-cluster-exists
     @just-k3d import kubert-examples:test
 
-_test-sfx := `tr -dc 'a-z0-9' </dev/urandom | fold -w 5 | head -n 1`
+_test-sfx := choose('5', HEX)
 test-ns := env_var_or_default("KUBERT_TEST_NS", "kubert-" + _test-sfx)
 
 test-cluster-create-ns: _test-cluster-exists

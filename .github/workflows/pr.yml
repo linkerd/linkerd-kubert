@@ -162,8 +162,9 @@ jobs:
     strategy:
       matrix:
         rust:
+          - "1.99"
           - "1.92"
-          - "1.88"
+          - "1.90"
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
@@ -272,8 +273,9 @@ jobs:
     strategy:
       matrix:
         rust:
+          - "1.99"
           - "1.92"
-          - "1.88"
+          - "1.90"
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
@@ -294,8 +296,9 @@ jobs:
     strategy:
       matrix:
         rust:
+          - "1.99"
           - "1.92"
-          - "1.88"
+          - "1.90"
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:

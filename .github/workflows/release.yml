@@ -30,7 +30,7 @@ jobs:
   meta:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v46-rust
+    container: ghcr.io/linkerd/dev:v51-rust
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - id: meta
@@ -75,7 +75,7 @@ jobs:
   #   needs: [meta, release]
   #   timeout-minutes: 10
   #   runs-on: ubuntu-24.04
-  #   container: ghcr.io/linkerd/dev:v46-rust
+  #   container: ghcr.io/linkerd/dev:v51-rust
   #   env:
   #     RUSTFLAGS: '--cfg tokio_unstable'
   #     RUSTDOCFLAGS: '--cfg tokio_unstable'

@@ -125,7 +125,7 @@ jobs:
     if: needs.changed.outputs.rust == 'true' || needs.changed.outputs.build == 'true'
     timeout-minutes: 5
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v46-rust
+    container: ghcr.io/linkerd/dev:v51-rust
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: just fmt-check
@@ -135,7 +135,7 @@ jobs:
     if: needs.changed.outputs.rust == 'true' || needs.changed.outputs.cargo == 'true' || needs.changed.outputs.build == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v46-rust
+    container: ghcr.io/linkerd/dev:v51-rust
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
@@ -147,7 +147,7 @@ jobs:
     if: needs.changed.outputs.cargo == 'true' || needs.changed.outputs.deny == 'true' || needs.changed.outputs.build == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v46-rust
+    container: ghcr.io/linkerd/dev:v51-rust
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
@@ -203,7 +203,7 @@ jobs:
           - shutdown
     timeout-minutes: 10
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v46-rust
+    container: ghcr.io/linkerd/dev:v51-rust
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
